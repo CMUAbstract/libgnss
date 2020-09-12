@@ -1,0 +1,17 @@
+Library for handling gnss functionality
+
+Here's how the functions should go:
+
+in uart rx handler {
+  // Reset everything
+  if (data == "$")
+    counter = 0;
+    pkt_type = IN_PROGRESS;
+    active_pkt = 0;
+    len = 0;
+  if pkt_type == IN_PROGRESS
+    get_type() // sets active_pkt, uses and sets counter
+  if active_pkt
+    get_pkt // uses and sets counter, uses type/len
+
+
