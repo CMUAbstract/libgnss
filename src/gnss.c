@@ -1,6 +1,9 @@
 #include "gnss.h"
+
+#include <libio/console.h>
 #include <libmsp/mem.h>
 
+// All volatile variables that are reset on boot
 sentence_type pkt_type = INVALID;
 uint8_t active_pkt = 0;
 uint8_t gnss_pkt_counter = 0;
@@ -17,7 +20,7 @@ void get_sentence_type(char data) {
       }
         break;
     case 1:
-      if (data != 'P') {
+      if (data != 'P' && data != 'N') {
         pkt_type = INVALID;
       }
         break;
@@ -59,7 +62,6 @@ void get_sentence_type(char data) {
   return;
 }
 
-// Updates the fix, lat/long and time NV globals
 
 __nv sentence gnss_sentence1;
 sentence *cur_gnss_ptr = &gnss_sentence1;
@@ -68,7 +70,7 @@ sentence *cur_gnss_ptr = &gnss_sentence1;
 int get_sentence_pkt(char data) {
   //TODO field filtering
   if (gnss_pkt_counter < FULL_SENTENCE_LEN) {
-    cur_gnss_ptr->buffer[gnss_pkt_counter] = data;
+    cur_gnss_ptr->buffer[gnss_pkt_counter - 5] = data;
     gnss_pkt_counter++;
     return 0;
   }
@@ -93,43 +95,53 @@ int process_sentence_pkt(sentence *pkt_in, gps_data *pkt_out) {
     // Error processing
     return 1;
   }
+  LOG("checking time %i\r\n",pkt_in->type);
   switch (pkt_in->type) {
     case GPGGA:
       for (int i = 0; i < 13; i++) {
         pkt_out->time[i] = pkt_in->buffer[i + 1];
+        LOG("time: %c \r\n",pkt_in->buffer[i+1]);
       }
       if (pkt_in->buffer[14] != ',') { return 1; }
       for (int i = 0; i < 9; i++) {
         pkt_out->lat[i] = pkt_in->buffer[i + 15];
+        LOG("lat: %c \r\n",pkt_in->buffer[i+15]);
       }
       pkt_out->lat[9] = pkt_in->buffer[25];
       if (pkt_in->buffer[24] != ',' || pkt_in->buffer[26] != ',') { return 1; }
-      if (pkt_in->buffer[37] != ',' || pkt_in->buffer[39] != ',' ||
-        pkt_in->buffer[41] != ',') { return 1; }
       for (int i = 0; i < 10; i++) {
         pkt_out->longi[i] = pkt_in->buffer[i + 27];
+        LOG("long: %c \r\n",pkt_in->buffer[i+27]);
+      }
+      if (pkt_in->buffer[37] != ',' || pkt_in->buffer[39] != ',' ||
+        pkt_in->buffer[41] != ',') { 
+        LOG("comma error %c %c %c \r\n", pkt_in->buffer[37],
+        pkt_in->buffer[39],pkt_in->buffer[41]);
+        return 1;
       }
       pkt_out->longi[10] = pkt_in->buffer[38];
       pkt_out->fix[0] = pkt_in->buffer[40];
+      LOG("Good PKT!\r\n");
       break;
     case GPGLL:
       // Capture ,9,1,10,1,13,1, = 42
-      if (pkt_in->buffer[10] != ',') { return 1; }
-      if (pkt_in->buffer[12] != ',' || pkt_in->buffer[23] != ',') { return 1; }
-      if (pkt_in->buffer[25] != ',' || pkt_in->buffer[39] != ',' ||
-        pkt_in->buffer[41] != ',') { return 1; }
       for (int i = 0; i < 9; i++) {
         pkt_out->lat[i] = pkt_in->buffer[i + 1];
       }
+      if (pkt_in->buffer[10] != ',') { return 1; }
       pkt_out->lat[9] = pkt_in->buffer[11];
+      if (pkt_in->buffer[12] != ',' || pkt_in->buffer[23] != ',') { return 1; }
       for (int i = 0; i < 10; i++) {
         pkt_out->longi[i] = pkt_in->buffer[i + 13];
       }
       pkt_out->longi[10] = pkt_in->buffer[24];
+      if (pkt_in->buffer[25] != ',' || pkt_in->buffer[39] != ',' ||
+        pkt_in->buffer[41] != ',') { return 1; }
       for (int i = 0; i < 13; i++) {
         pkt_out->time[i] = pkt_in->buffer[i + 26];
       }
       pkt_out->fix[0] = pkt_in->buffer[40];
+      LOG("Good PKT GLL!\r\n");
       break;
     case GPRMC:
         // Capture ,13,1,9,1,10,1, = 42
@@ -137,18 +149,19 @@ int process_sentence_pkt(sentence *pkt_in, gps_data *pkt_out) {
         pkt_out->time[i] = pkt_in->buffer[i + 1];
       }
       if (pkt_in->buffer[14] != ',') { return 1; }
+      pkt_out->fix[0] = pkt_in->buffer[15];
       for (int i = 0; i < 9; i++) {
-        pkt_out->lat[i] = pkt_in->buffer[i + 15];
+        pkt_out->lat[i] = pkt_in->buffer[i + 17];
       }
-      pkt_out->lat[9] = pkt_in->buffer[25];
-      if (pkt_in->buffer[24] != ',' || pkt_in->buffer[26] != ',') { return 1; }
-      if (pkt_in->buffer[37] != ',' || pkt_in->buffer[39] != ',' ||
-        pkt_in->buffer[41] != ',') { return 1; }
+      if (pkt_in->buffer[16] != ',' || pkt_in->buffer[26] != ',') { return 1; }
+      pkt_out->lat[9] = pkt_in->buffer[27];
       for (int i = 0; i < 10; i++) {
-        pkt_out->longi[i] = pkt_in->buffer[i + 27];
+        pkt_out->longi[i] = pkt_in->buffer[i + 29];
       }
-      pkt_out->longi[10] = pkt_in->buffer[38];
-      pkt_out->fix[0] = pkt_in->buffer[40];
+      pkt_out->longi[10] = pkt_in->buffer[40];
+      if (pkt_in->buffer[28] != ',' || pkt_in->buffer[39] != ',' ||
+        pkt_in->buffer[41] != ',') { return 1; }
+      LOG("Good PKT RMC!\r\n");
       break;
     default:
       break;

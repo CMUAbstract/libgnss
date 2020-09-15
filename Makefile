@@ -3,6 +3,8 @@ LIB = libgnss
 OBJECTS = \
 	gnss.o
 
+DEPS += libmsp libio
+
 override SRC_ROOT = ../../src
 
 override CFLAGS += \
