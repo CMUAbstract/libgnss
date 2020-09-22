@@ -10,6 +10,11 @@
 #define SENTENCE_LEN 42
 #define FULL_SENTENCE_LEN 47
 
+typedef enum fix_types_ {
+  FIX_OK,
+  FIX_INVALID
+} fix_type;
+
 typedef enum sentence_types_ {
   IN_PROGRESS,
   INVALID,
@@ -27,7 +32,7 @@ typedef struct gps_data_ {
   char time[13];
   char lat[10];
   char longi[11];
-  char fix[1];
+  fix_type fix[1];
   int complete;
 } gps_data;
 

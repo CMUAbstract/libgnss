@@ -15,12 +15,14 @@ void get_sentence_type(char data) {
   // GPGGA, GPGLL, GPRMC
   switch (gnss_pkt_counter) {
     case 0:
-      if (data != 'G') {
+      //if (data != 'G') { // removed to allow for Baidu
+      if (data < 'A' || data > 'Z') {
         pkt_type = INVALID;
       }
         break;
     case 1:
-      if (data != 'P' && data != 'N') {
+      //if (data != 'P' && data != 'N') { // removed to allow for Baidu?
+      if (data < 'A' || data > 'Z') {
         pkt_type = INVALID;
       }
         break;
@@ -95,8 +97,7 @@ int process_sentence_pkt(sentence *pkt_in, gps_data *pkt_out) {
     // Error processing
     return 1;
   }
-  LOG("checking time %i\r\n",pkt_in->type);
-  switch (pkt_in->type) {
+  LOG("checking time %i\r\n",pkt_in->type); switch (pkt_in->type) {
     case GPGGA:
       for (int i = 0; i < 13; i++) {
         pkt_out->time[i] = pkt_in->buffer[i + 1];
@@ -120,7 +121,15 @@ int process_sentence_pkt(sentence *pkt_in, gps_data *pkt_out) {
         return 1;
       }
       pkt_out->longi[10] = pkt_in->buffer[38];
-      pkt_out->fix[0] = pkt_in->buffer[40];
+      // Fix > 1 == OK
+      if (pkt_in->buffer[40] > '0' && pkt_in->buffer[40] < '8') {
+        pkt_out->fix[0] = FIX_OK;
+        LOG("Fix valid!\r\n");
+      }
+      else {
+        pkt_out->fix[0] = FIX_INVALID;
+        LOG("Fix invalid!!!! %c\r\n", pkt_in->buffer[40]);
+      }
       LOG("Good PKT!\r\n");
       break;
     case GPGLL:
@@ -140,7 +149,15 @@ int process_sentence_pkt(sentence *pkt_in, gps_data *pkt_out) {
       for (int i = 0; i < 13; i++) {
         pkt_out->time[i] = pkt_in->buffer[i + 26];
       }
-      pkt_out->fix[0] = pkt_in->buffer[40];
+      // A = OK
+      if (pkt_in->buffer[40] == 'A') {
+        pkt_out->fix[0] = FIX_OK;
+        LOG("Fix valid!\r\n");
+      }
+      else {
+        pkt_out->fix[0] = FIX_INVALID;
+        LOG("Fix invalid!!!! %c\r\n", pkt_in->buffer[40]);
+      }
       LOG("Good PKT GLL!\r\n");
       break;
     case GPRMC:
@@ -149,7 +166,15 @@ int process_sentence_pkt(sentence *pkt_in, gps_data *pkt_out) {
         pkt_out->time[i] = pkt_in->buffer[i + 1];
       }
       if (pkt_in->buffer[14] != ',') { return 1; }
-      pkt_out->fix[0] = pkt_in->buffer[15];
+      // A = ok
+      if (pkt_in->buffer[15] == 'A') {
+        pkt_out->fix[0] = FIX_OK;
+        LOG("Fix valid!\r\n");
+      }
+      else {
+        pkt_out->fix[0] = FIX_INVALID;
+        LOG("Fix invalid!!!! %c\r\n", pkt_in->buffer[15]);
+      }
       for (int i = 0; i < 9; i++) {
         pkt_out->lat[i] = pkt_in->buffer[i + 17];
       }
