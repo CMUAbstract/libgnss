@@ -3,6 +3,12 @@
 #include <libio/console.h>
 #include <libmsp/mem.h>
 
+const char disable01[DISABLE_MSG_LEN] = "$PSRF103,01,00,00,00*24\r\n";
+const char disable02[DISABLE_MSG_LEN] = "$PSRF103,02,00,00,00*27\r\n";
+const char disable03[DISABLE_MSG_LEN] = "$PSRF103,03,00,00,00*26\r\n";
+const char disable04[DISABLE_MSG_LEN] = "$PSRF103,04,00,00,00*21\r\n";
+const char disable05[DISABLE_MSG_LEN] = "$PSRF103,05,00,00,00*20\r\n";
+
 // All volatile variables that are reset on boot
 sentence_type pkt_type = INVALID;
 uint8_t active_pkt = 0;
@@ -195,16 +201,13 @@ int process_sentence_pkt(sentence *pkt_in, gps_data *pkt_out) {
   return 0;
 }
 
-#define DEGS(x) \
-((x[0] - 0x30)*10 + (x[1] - 0x30))
-
 
 // To add more "good" locations, update this function with their lat/long and
 // extend the locations enum with the new location
 locations good_location(gps_data *pkt) {
-  int lat = DEGS(pkt->lat);
+  int lat = DEGS_LAT(pkt->lat);
   char lat_d = pkt->lat[9];
-  int longi = DEGS(pkt->longi);
+  int longi = DEGS_LONG(pkt->longi);
   char longi_d = pkt->longi[10];
   // Over pittsburgh
   if (lat < 41 && lat > 39 && lat_d == 'N') {
@@ -225,7 +228,5 @@ locations good_location(gps_data *pkt) {
   }
   return NOWHERE;
 }
-
-
 
 
