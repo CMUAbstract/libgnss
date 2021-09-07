@@ -3,11 +3,9 @@
 #include <libio/console.h>
 #include <libmsp/mem.h>
 
-const char disable01[DISABLE_MSG_LEN] = "$PSRF103,01,00,00,00*24\r\n";
-const char disable02[DISABLE_MSG_LEN] = "$PSRF103,02,00,00,00*27\r\n";
-const char disable03[DISABLE_MSG_LEN] = "$PSRF103,03,00,00,00*26\r\n";
-const char disable04[DISABLE_MSG_LEN] = "$PSRF103,04,00,00,00*21\r\n";
-const char disable05[DISABLE_MSG_LEN] = "$PSRF103,05,00,00,00*20\r\n";
+__nv gps_data gps_data1 = { {0},{0}, {0}, {0}, {0}, 0};
+__nv gps_data gps_data2 = { {0},{0}, {0}, {0}, {0}, 0};
+__nv gps_data *cur_gps_data = &gps_data1;
 
 // All volatile variables that are reset on boot
 sentence_type pkt_type = INVALID;
@@ -77,7 +75,7 @@ sentence *cur_gnss_ptr = &gnss_sentence1;
 // Returns 1 if packet is complete, 0 if still processing
 int get_sentence_pkt(char data) {
   //TODO field filtering
-  if (gnss_pkt_counter < FULL_SENTENCE_LEN) {
+  if ((uint8_t)data != 10) {
     cur_gnss_ptr->buffer[gnss_pkt_counter - 5] = data;
     gnss_pkt_counter++;
     return 0;
@@ -96,7 +94,7 @@ int process_sentence_pkt(sentence *pkt_in, gps_data *pkt_out) {
   //(1, E/W),fix (1 digit).... 13,9,1,10,1,1,...
   //GLL: lat (4.2 digits), N/S, long (5.2 digits), E/W, time (6 digits), fix
   //(A/V)...
-  //RMC: time (6 digits), fix (A/V), lat, N/S, long, E/W,...
+  //RMC: time (6 digits), fix (A/V), lat, N/S, long, E/W,..., date (6 digits)
   // Make sure we can't partially fill the data
   pkt_out->complete = 0;
   if (pkt_in->buffer[0] != ',') {
@@ -167,7 +165,7 @@ int process_sentence_pkt(sentence *pkt_in, gps_data *pkt_out) {
       LOG("Good PKT GLL!\r\n");
       break;
     case GPRMC:
-        // Capture ,13,1,9,1,10,1, = 42
+        // Capture ,13,1,9,1,10,1,5,5,6, = 60
       for (int i = 0; i < 13; i++) {
         pkt_out->time[i] = pkt_in->buffer[i + 1];
       }
@@ -192,15 +190,22 @@ int process_sentence_pkt(sentence *pkt_in, gps_data *pkt_out) {
       pkt_out->longi[10] = pkt_in->buffer[40];
       if (pkt_in->buffer[28] != ',' || pkt_in->buffer[39] != ',' ||
         pkt_in->buffer[41] != ',') { return 1; }
+      if (pkt_in->buffer[47] != ',' || pkt_in->buffer[53] != ',') { return 1; }
+      for (int i = 0; i < 6; i++) {
+        pkt_out->date[i] = pkt_in->buffer[i + 54];
+        LOG("date: %u\r\n",pkt_out->date[i]);
+      }
       LOG("Good PKT RMC!\r\n");
       break;
     default:
       break;
   }
+  LOG("Pkt complete! %u\r\n",pkt_out->fix[0]);
   pkt_out->complete = 1;
   return 0;
 }
 
+//$GNRMC,232831.126562,A,4026.6278,N,07956.7370,W,0.000,000.0,020921,,,A*52
 
 // To add more "good" locations, update this function with their lat/long and
 // extend the locations enum with the new location
@@ -229,4 +234,32 @@ locations good_location(gps_data *pkt) {
   return NOWHERE;
 }
 
+// Returns 1 if  if  newer time > older time
+// Returns 0 if newer time == older time
+// Returns -1 if newer time < older time
+int time_compare(gps_data *newer, gps_data *older) {
+  // Check date
+  for(int i = 0; i < 6; i++) {
+    LOG2("D: %c vs %c\r\n",newer->date[i],older->date[i]);
+    if (newer->date[i] > older->date[i]) {
+      return 1;
+    }
+    if (newer->date[i] < older->date[i]) {
+      return -1;
+    }
+  }
+  // All times are %6.6f format, but we're only checking whole seconds at the
+  // moment
+  for(int i = 0; i < 6; i++) {
+    LOG2("T: %c vs %c\r\n",newer->time[i],older->time[i]);
+    if (newer->time[i] > older->time[i]) {
+      return 1;
+    }
+    if (older->time[i] > newer->time[i]) {
+      return -1;
+    }
+  }
+  // Again, we're not checking after the "."
+  return 0;
+}
 
