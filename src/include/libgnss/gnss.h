@@ -96,8 +96,8 @@ locations good_location(gps_data *pkt);
 int time_compare(gps_data *newer, gps_data *older);
 
 extern sentence *cur_gnss_ptr;
-extern sentence_type pkt_type;
-extern uint8_t active_pkt;
+extern sentence_type gnss_pkt_type;
+extern uint8_t gnss_active_pkt;
 extern uint8_t gnss_pkt_counter;
 
 extern gps_data gps_data1;

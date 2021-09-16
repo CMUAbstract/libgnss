@@ -8,8 +8,8 @@ __nv gps_data gps_data2 = { {0},{0}, {0}, {0}, {0}, 0};
 __nv gps_data *cur_gps_data = &gps_data1;
 
 // All volatile variables that are reset on boot
-sentence_type pkt_type = INVALID;
-uint8_t active_pkt = 0;
+sentence_type gnss_pkt_type = INVALID;
+uint8_t gnss_active_pkt = 0;
 uint8_t gnss_pkt_counter = 0;
 
 char type_buff[5];
@@ -21,18 +21,18 @@ void get_sentence_type(char data) {
     case 0:
       //if (data != 'G') { // removed to allow for Baidu
       if (data < 'A' || data > 'Z') {
-        pkt_type = INVALID;
+        gnss_pkt_type = INVALID;
       }
         break;
     case 1:
       //if (data != 'P' && data != 'N') { // removed to allow for Baidu?
       if (data < 'A' || data > 'Z') {
-        pkt_type = INVALID;
+        gnss_pkt_type = INVALID;
       }
         break;
     case 2:
       if (data != 'G' && data != 'R') {
-        pkt_type = INVALID;
+        gnss_pkt_type = INVALID;
       }
         break;
     case 3:
@@ -43,23 +43,23 @@ void get_sentence_type(char data) {
         break;
       }
       else {
-        pkt_type = INVALID;
+        gnss_pkt_type = INVALID;
         break;
       }
     case 4:
       if (data == 'A' && type_buff[3] == 'G') {
-        active_pkt = 1;
-        pkt_type = GPGGA;
+        gnss_active_pkt = 1;
+        gnss_pkt_type = GPGGA;
         break;
       }
       if (data == 'L' && type_buff[3] == 'L') {
-        active_pkt = 1;
-        pkt_type = GPGLL;
+        gnss_active_pkt = 1;
+        gnss_pkt_type = GPGLL;
         break;
       }
       if (data == 'C' && type_buff[3] == 'M') {
-        active_pkt =1;
-        pkt_type = GPRMC;
+        gnss_active_pkt =1;
+        gnss_pkt_type = GPRMC;
         break;
       }
   }
@@ -82,7 +82,7 @@ int get_sentence_pkt(char data) {
   }
   else {
     // Set packet type
-    cur_gnss_ptr->type = pkt_type;
+    cur_gnss_ptr->type = gnss_pkt_type;
     return 1;
   }
 }
